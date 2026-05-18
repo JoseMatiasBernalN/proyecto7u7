@@ -1,261 +1,283 @@
 <template>
-  <div class="page-bg">
-    <div class="container">
+  <div class="det-page">
 
-      <div v-if="loading" class="state-msg">Cargando perfil...</div>
-      <div v-if="error" class="state-msg error">{{ error }}</div>
+    <header class="det-topbar">
+      <button class="back-link" @click="$router.back()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        Volver
+      </button>
+      <router-link to="/" class="det-brand">MenteSana</router-link>
+    </header>
 
-      <div v-if="psicologo" class="profile-card">
+    <div v-if="loading" class="det-state">Cargando perfil...</div>
+    <div v-if="!loading && !psicologo" class="det-state error">Psicólogo no encontrado.</div>
 
-        <!-- Header con foto y nombre -->
+    <!-- MODAL CITA -->
+    <div v-if="modalCita" class="modal-overlay" @click.self="modalCita = false">
+      <div class="modal-cita">
+        <div class="modal-head">
+          <span class="modal-title">Agendar cita con {{ psicologo?.nombre }}</span>
+          <button class="modal-close" @click="modalCita = false">✕</button>
+        </div>
+        <div class="modal-cita-body" v-if="!citaEnviada">
+          <div class="field-group">
+            <label class="field-label">Tu nombre (o alias)</label>
+            <input v-model="cita.nombre" class="field-input" placeholder="Cómo quieres que te llamen...">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Correo de contacto</label>
+            <input v-model="cita.correo" class="field-input" type="email" placeholder="tu@correo.com">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Fecha preferida</label>
+            <input v-model="cita.fecha" class="field-input" type="date" :min="hoy">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Motivo de consulta (opcional)</label>
+            <textarea v-model="cita.motivo" class="field-textarea" rows="3" placeholder="Cuéntanos brevemente qué te trae..."></textarea>
+          </div>
+          <div v-if="errorCita" class="modal-error">{{ errorCita }}</div>
+          <div class="modal-actions">
+            <button class="btn-ghost-sm" @click="modalCita = false">Cancelar</button>
+            <button class="btn-green" @click="enviarCita">Confirmar solicitud</button>
+          </div>
+        </div>
+        <div v-else class="cita-exito">
+          <div class="cita-exito-ico">✅</div>
+          <div class="cita-exito-title">¡Solicitud enviada!</div>
+          <p>{{ psicologo.nombre }} recibirá tu solicitud en <strong>{{ cita.correo }}</strong>. Te contactarán pronto.</p>
+          <button class="btn-green" @click="modalCita = false; citaEnviada = false">Cerrar</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="psicologo" class="det-layout">
+
+      <!-- CARD PERFIL -->
+      <div class="profile-card">
         <div class="profile-header">
           <div class="avatar-ring">
-            <img :src="psicologo.imagen" :alt="psicologo.nombre" />
+            <img :src="psicologo.imagen" :alt="psicologo.nombre">
           </div>
-          <h1>{{ psicologo.nombre }}</h1>
-          <span class="badge">Especialista en Salud Mental</span>
+          <h1 class="profile-nombre">{{ psicologo.nombre }}</h1>
+          <div class="profile-badge">Especialista en Salud Mental</div>
+          <div class="profile-disponible">● Disponible para consultas</div>
         </div>
 
-        <!-- Cuerpo con info -->
         <div class="profile-body">
           <div class="info-row">
-            <div class="info-icon">📝</div>
+            <div class="info-ico">📝</div>
             <div>
-              <span class="info-label">Descripción</span>
-              <p class="info-value">{{ psicologo.descripcion }}</p>
+              <div class="info-label">Especialidad</div>
+              <div class="info-value">{{ psicologo.descripcion }}</div>
             </div>
           </div>
-
           <div class="info-row">
-            <div class="info-icon">📍</div>
+            <div class="info-ico">📍</div>
             <div>
-              <span class="info-label">Ubicación</span>
-              <p class="info-value">{{ psicologo.ubicacion }}</p>
+              <div class="info-label">Ubicación</div>
+              <div class="info-value">{{ psicologo.ubicacion }}, Colombia</div>
             </div>
           </div>
-
           <div class="info-row">
-            <div class="info-icon">✉️</div>
+            <div class="info-ico">✉️</div>
             <div>
-              <span class="info-label">Correo</span>
-              <a :href="'mailto:' + psicologo.correo" class="info-value link">
-                {{ psicologo.correo }}
-              </a>
+              <div class="info-label">Correo de contacto</div>
+              <a :href="`mailto:${psicologo.correo}`" class="info-link">{{ psicologo.correo }}</a>
+            </div>
+          </div>
+          <div class="info-row" style="border-bottom:none;">
+            <div class="info-ico">🕐</div>
+            <div>
+              <div class="info-label">Disponibilidad</div>
+              <div class="info-value">Lunes a Viernes, 8am – 6pm</div>
             </div>
           </div>
         </div>
 
-        <!-- Botones -->
         <div class="profile-actions">
-          <button class="btn-back" @click="$router.back()">← Volver</button>
-          <button class="btn-primary">Agendar Cita</button>
+          <button class="btn-back-sm" @click="$router.back()">← Volver</button>
+          <button class="btn-agendar" @click="modalCita = true">Agendar Cita</button>
+          <a :href="`mailto:${psicologo.correo}`" class="btn-correo">✉️ Escribir</a>
+        </div>
+      </div>
+
+      <!-- SIDEBAR INFO -->
+      <div class="det-sidebar">
+        <div class="det-widget">
+          <div class="det-widget-title">¿Por qué buscar ayuda?</div>
+          <p class="det-widget-text">Hablar con un profesional no significa que estés "loco/a". Significa que te importas lo suficiente para buscar apoyo. Dar ese paso es un acto de valentía.</p>
         </div>
 
+        <div class="det-widget">
+          <div class="det-widget-title">Otros psicólogos</div>
+          <div v-for="otro in otrosPsicologos" :key="otro.id" class="otro-item">
+            <img :src="otro.imagen" :alt="otro.nombre" class="otro-avatar">
+            <div class="otro-info">
+              <div class="otro-nombre">{{ otro.nombre }}</div>
+              <div class="otro-esp">{{ otro.descripcion }}</div>
+            </div>
+            <router-link :to="`/psicologos/${otro.id}`" class="otro-btn">Ver</router-link>
+          </div>
+        </div>
+
+        <div class="det-widget crisis-widget">
+          <div class="crisis-title">🆘 ¿En crisis ahora?</div>
+          <p class="crisis-text">Llama a la línea de salud mental gratuita</p>
+          <div class="crisis-num">106</div>
+          <div class="crisis-sub">Disponible 24/7 en Colombia</div>
+        </div>
       </div>
+
     </div>
   </div>
 </template>
 
 <script>
-import axios from 'axios';
+import store from '@/store'
 
 export default {
-  name: 'PsicologoDetalle',
-
+  name: 'DetallesView',
+  props: ['id'],
   data() {
     return {
       psicologo: null,
-      loading: false,
-      error: null
-    };
-  },
-
-  methods: {
-    async obtenerPsicologo() {
-      this.loading = true;
-      try {
-        const id = this.$route.params.id;
-        const res = await axios.get(`http://127.0.0.1:8000/psicologos/${id}`);
-        this.psicologo = res.data;
-      } catch (e) {
-        this.error = e.message;
-      } finally {
-        this.loading = false;
-      }
+      loading: true,
+      modalCita: false,
+      citaEnviada: false,
+      errorCita: '',
+      cita: { nombre: '', correo: '', fecha: '', motivo: '' },
     }
   },
-
+  computed: {
+    hoy() {
+      return new Date().toISOString().split('T')[0]
+    },
+    otrosPsicologos() {
+      return store.getPsicologos()
+        .filter(p => p.id !== parseInt(this.id))
+        .slice(0, 3)
+    }
+  },
+  methods: {
+    enviarCita() {
+      this.errorCita = ''
+      if (!this.cita.nombre.trim()) { this.errorCita = 'Escribe cómo quieres que te llamen'; return }
+      if (!this.cita.correo.includes('@')) { this.errorCita = 'Introduce un correo válido'; return }
+      if (!this.cita.fecha) { this.errorCita = 'Selecciona una fecha'; return }
+      this.citaEnviada = true
+    }
+  },
   mounted() {
-    this.obtenerPsicologo();
+    const p = store.getPsicologoPorId(this.id)
+    this.psicologo = p
+    this.loading = false
   }
-};
+}
 </script>
 
 <style scoped>
-.page-bg {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #e8f4fd 0%, #f4f8ff 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-}
+.det-page { min-height: 100vh; background: var(--cream); font-family: 'DM Sans', sans-serif; }
 
-.container {
-  width: 100%;
-  max-width: 520px;
+.det-topbar {
+  background: var(--cream-light); border-bottom: 1px solid var(--border);
+  height: 56px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 28px; position: sticky; top: 0; z-index: 50;
 }
+.back-link {
+  display: flex; align-items: center; gap: 6px;
+  background: none; border: none; font-size: 13.5px; color: var(--text-mid);
+  cursor: pointer; transition: color 0.15s;
+}
+.back-link:hover { color: var(--green); }
+.det-brand { font-family: 'DM Serif Display', serif; font-size: 17px; color: var(--text-dark); text-decoration: none; }
+.det-state { text-align: center; padding: 60px; color: var(--text-faint); font-size: 15px; }
+.det-state.error { color: #C44; }
 
-/* Card principal */
+/* LAYOUT */
+.det-layout { display: flex; gap: 24px; max-width: 1000px; margin: 40px auto; padding: 0 24px; align-items: flex-start; }
+
+/* CARD PERFIL */
 .profile-card {
-  background: white;
-  border-radius: 24px;
-  box-shadow: 0 20px 60px rgba(52, 152, 219, 0.15);
-  overflow: hidden;
+  flex: 1; background: var(--cream-light); border: 1px solid var(--border);
+  border-radius: 20px; overflow: hidden;
 }
-
-/* Header azul degradado */
 .profile-header {
-  background: linear-gradient(135deg, #3498db, #2471a3);
-  padding: 2.5rem 2rem 2rem;
-  text-align: center;
-  color: white;
+  background: linear-gradient(135deg,#4A7C59,#3A6449);
+  padding: 36px 28px 28px; text-align: center; color: #FFFAF5;
 }
-
 .avatar-ring {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  border: 4px solid rgba(255,255,255,0.8);
-  overflow: hidden;
-  margin: 0 auto 1rem;
-  box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+  width: 110px; height: 110px; border-radius: 50%;
+  border: 4px solid rgba(255,250,245,0.7); overflow: hidden;
+  margin: 0 auto 14px; box-shadow: 0 6px 20px rgba(0,0,0,0.2);
 }
-
-.avatar-ring img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.avatar-ring img { width: 100%; height: 100%; object-fit: cover; }
+.profile-nombre { font-family: 'DM Serif Display', serif; font-size: 24px; color: #FFFAF5; margin-bottom: 8px; }
+.profile-badge {
+  display: inline-block; background: rgba(255,250,245,0.18);
+  padding: 4px 14px; border-radius: 20px; font-size: 12.5px; margin-bottom: 8px;
 }
+.profile-disponible { font-size: 12px; color: rgba(255,250,245,0.8); }
 
-.profile-header h1 {
-  font-size: 1.6rem;
-  font-weight: 800;
-  margin: 0 0 0.5rem;
-}
-
-.badge {
-  display: inline-block;
-  background: rgba(255,255,255,0.2);
-  color: white;
-  padding: 0.3rem 1rem;
-  border-radius: 20px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  backdrop-filter: blur(4px);
-}
-
-/* Cuerpo info */
-.profile-body {
-  padding: 1.8rem 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
-}
-
+.profile-body { padding: 20px 24px; display: flex; flex-direction: column; gap: 0; }
 .info-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-  padding: 1rem;
-  background: #f8fbff;
-  border-radius: 12px;
-  border-left: 4px solid #3498db;
+  display: flex; gap: 14px; padding: 14px 0;
+  border-bottom: 1px solid var(--border); align-items: flex-start;
 }
+.info-ico { font-size: 18px; flex-shrink: 0; margin-top: 2px; }
+.info-label { font-size: 11px; font-weight: 500; color: var(--green); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+.info-value { font-size: 14px; color: var(--text-dark); }
+.info-link { font-size: 14px; color: var(--green); text-decoration: none; }
+.info-link:hover { text-decoration: underline; }
 
-.info-icon {
-  font-size: 1.3rem;
-  margin-top: 2px;
-}
+.profile-actions { display: flex; gap: 10px; padding: 20px 24px; }
+.btn-back-sm { flex: 1; padding: 10px; border: 1.5px solid var(--border-mid); background: none; border-radius: 12px; font-size: 13.5px; color: var(--text-mid); cursor: pointer; }
+.btn-back-sm:hover { border-color: var(--green); color: var(--green); }
+.btn-agendar { flex: 2; background: var(--green); color: #FFFAF5; border: none; border-radius: 12px; padding: 10px; font-size: 13.5px; font-weight: 500; cursor: pointer; }
+.btn-agendar:hover { background: var(--green-dark); }
+.btn-correo { flex: 1; background: var(--green-bg); color: var(--green-dark); border: none; border-radius: 12px; padding: 10px; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; text-align: center; }
 
-.info-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #3498db;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  display: block;
-  margin-bottom: 2px;
-}
+/* SIDEBAR */
+.det-sidebar { width: 300px; flex-shrink: 0; display: flex; flex-direction: column; gap: 14px; }
+.det-widget { background: var(--cream-light); border: 1px solid var(--border); border-radius: 16px; padding: 18px; }
+.det-widget-title { font-family: 'DM Serif Display', serif; font-size: 15px; color: var(--text-dark); margin-bottom: 10px; }
+.det-widget-text { font-size: 13px; color: var(--text-muted); line-height: 1.6; font-style: italic; }
 
-.info-value {
-  font-size: 0.95rem;
-  color: #2c3e50;
-  margin: 0;
-}
+.otro-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.otro-item:last-child { border-bottom: none; }
+.otro-avatar { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.otro-info { flex: 1; min-width: 0; }
+.otro-nombre { font-size: 13px; font-weight: 500; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.otro-esp { font-size: 11.5px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.otro-btn { background: var(--green-bg); color: var(--green-dark); border: none; border-radius: 8px; padding: 5px 12px; font-size: 12px; font-weight: 500; cursor: pointer; text-decoration: none; flex-shrink: 0; }
+.otro-btn:hover { background: #C8D9CC; }
 
-.link {
-  color: #2980b9;
-  text-decoration: none;
-}
+.crisis-widget { background: #FEF5F5; border-color: #F09595; }
+.crisis-title { font-size: 14px; font-weight: 500; color: #A32D2D; margin-bottom: 6px; }
+.crisis-text { font-size: 13px; color: #7A2020; margin-bottom: 8px; }
+.crisis-num { font-family: 'DM Serif Display', serif; font-size: 36px; color: #A32D2D; line-height: 1; }
+.crisis-sub { font-size: 11.5px; color: #C44; margin-top: 4px; }
 
-.link:hover {
-  text-decoration: underline;
-}
+/* MODAL CITA */
+.modal-overlay { position: fixed; inset: 0; background: rgba(44,31,20,0.45); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.modal-cita { background: var(--cream-light); border-radius: 20px; width: 100%; max-width: 480px; overflow: hidden; box-shadow: 0 20px 60px rgba(44,31,20,0.25); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 1px solid var(--border); }
+.modal-title { font-family: 'DM Serif Display', serif; font-size: 16px; color: var(--text-dark); }
+.modal-close { width: 30px; height: 30px; border-radius: 8px; border: none; background: var(--cream-mid); color: var(--text-muted); cursor: pointer; font-size: 13px; }
+.modal-cita-body { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+.field-group { display: flex; flex-direction: column; gap: 5px; }
+.field-label { font-size: 13px; font-weight: 500; color: var(--text-mid); }
+.field-input { border: 1.5px solid var(--border); border-radius: 12px; padding: 10px 14px; font-size: 14px; color: var(--text-dark); background: var(--cream); outline: none; }
+.field-input:focus { border-color: var(--green-light); }
+.field-textarea { border: 1.5px solid var(--border); border-radius: 12px; padding: 10px 14px; font-size: 14px; color: var(--text-dark); background: var(--cream); outline: none; resize: none; font-family: 'DM Sans', sans-serif; }
+.modal-error { font-size: 12.5px; color: #C44; background: #FEE; padding: 8px 12px; border-radius: 8px; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.btn-ghost-sm { background: none; border: 1.5px solid var(--border-mid); border-radius: 10px; padding: 8px 16px; font-size: 13px; color: var(--text-mid); cursor: pointer; }
+.btn-green { background: var(--green); color: #FFFAF5; border: none; border-radius: 10px; padding: 9px 20px; font-size: 13.5px; font-weight: 500; cursor: pointer; }
+.btn-green:hover { background: var(--green-dark); }
 
-/* Botones */
-.profile-actions {
-  padding: 0 2rem 2rem;
-  display: flex;
-  gap: 1rem;
-}
-
-.btn-back {
-  flex: 1;
-  padding: 0.75rem;
-  border: 2px solid #bdc3c7;
-  background: transparent;
-  color: #5d6d7e;
-  border-radius: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-back:hover {
-  border-color: #3498db;
-  color: #3498db;
-}
-
-.btn-primary {
-  flex: 2;
-  padding: 0.75rem;
-  background: linear-gradient(135deg, #3498db, #2471a3);
-  color: white;
-  border: none;
-  border-radius: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: opacity 0.2s ease;
-  font-size: 0.95rem;
-}
-
-.btn-primary:hover {
-  opacity: 0.88;
-}
-
-/* Estados */
-.state-msg {
-  text-align: center;
-  padding: 1rem;
-  color: #5d6d7e;
-  font-weight: 500;
-}
-
-.state-msg.error {
-  color: #e74c3c;
-  background: #fdedec;
-  border-radius: 8px;
-}
+.cita-exito { padding: 36px 28px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.cita-exito-ico { font-size: 44px; }
+.cita-exito-title { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--green); }
+.cita-exito p { font-size: 14px; color: var(--text-muted); line-height: 1.6; }
 </style>
