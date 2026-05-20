@@ -38,6 +38,50 @@
             type="email" placeholder="tucorreo@email.com" @input="errores.email = ''">
           <div v-if="errores.email" class="field-error">{{ errores.email }}</div>
         </div>
+        <div class="field-group">
+          <label class="field-label">Ubicación</label>
+          <input
+            v-model="registro.ubicacion"
+            class="field-input"
+            type="text"
+            placeholder="Ej: Santa Marta"
+          >
+        </div>
+        <div class="field-group">
+          <label class="field-label">Teléfono</label>
+
+          <input
+            v-model="registro.telefono"
+            class="field-input"
+            type="text"
+            placeholder="3001234567"
+          >
+        </div>
+        <div class="field-group">
+          <label class="field-label">País</label>
+
+          <select
+              v-model="registro.localidad_id"
+              class="field-input">
+            <option disabled value="">Selecciona un país</option>
+
+            <option value="1">Colombia</option>
+            <option value="2">Argentina</option>
+            <option value="3">México</option>
+            <option value="4">España</option>
+            <option value="5">Chile</option>
+            <option value="6">Perú</option>
+            <option value="7">Brasil</option>
+            <option value="8">Estados Unidos</option>
+            <option value="9">Canadá</option>
+            <option value="10">Francia</option>
+            <option value="11">Alemania</option>
+            <option value="12">Reino Unido</option>
+            <option value="13">Italia</option>
+            <option value="14">Australia</option>
+            <option value="15">Japón</option>
+          </select>
+        </div>
 
         <div class="field-group">
           <label class="field-label">Contraseña</label>
@@ -136,7 +180,7 @@
 </template>
 
 <script>
-import store from '@/store'
+import axios from 'axios'
 
 export default {
   name: 'RegistroView',
@@ -144,7 +188,7 @@ export default {
     return {
       modo: 'registro',
       verPass: false,
-      registro: { alias: '', email: '', password: '' },
+      registro: {  alias: '',email: '',password: '',ubicacion: '',telefono: '',localidad_id: ''},
       login: { alias: '', password: '' },
       errores: {},
       errorGlobal: '',
@@ -162,30 +206,81 @@ export default {
     }
   },
   methods: {
-    hacerRegistro() {
-      this.errorGlobal = ''; this.exito = ''; this.errores = {}
-      if (this.registro.alias.length < 4) { this.errores.alias = 'El alias debe tener al menos 4 caracteres'; return }
-      if (!this.registro.email.includes('@')) { this.errores.email = 'Introduce un correo válido'; return }
-      if (this.registro.password.length < 6) { this.errores.password = 'La contraseña debe tener al menos 6 caracteres'; return }
-      const res = store.registrarUsuario(this.registro.alias, this.registro.email, this.registro.password)
-      if (!res.ok) { this.errorGlobal = res.msg; return }
-      this.exito = '¡Bienvenido/a! Redirigiendo...'
-      setTimeout(() => this.$router.push('/'), 1200)
+    async hacerRegistro() {
+      this.errorGlobal = '';
+      this.exito = '';
+      this.errores = {}
+
+      if (!this.registro.alias) { this.errores.alias = 'Escribe un alias'; return }
+      if (!this.registro.email) { this.errores.email = 'Escribe tu correo'; return }
+      if (!this.registro.password) { this.errores.password = 'Escribe una contraseña'; return }
+
+      try {
+        const nuevoUsuario = {
+          nombre: this.registro.alias,
+          correo: this.registro.email,
+          contraseña: this.registro.password,
+          ubicacion: this.registro.ubicacion,
+          localidad_id: Number(this.registro.localidad_id),
+          telefono: this.registro.telefono
+        };
+
+        await axios.post(
+          'https://proyecto-api-6s1y.onrender.com/usuarios',
+          nuevoUsuario
+        );
+
+        this.exito = '¡Cuenta creada correctamente!';
+
+        setTimeout(() => {
+          this.modo = 'login';
+        }, 1200);
+
+      } catch (error) {
+
+        console.error(error);
+
+        this.errorGlobal =
+          error.response?.data?.detail ||
+          'No se pudo crear la cuenta.';
+  }
     },
-    hacerLogin() {
-      this.errorGlobal = ''; this.exito = ''; this.errores = {}
-      if (!this.login.alias) { this.errores.loginAlias = 'Escribe tu alias'; return }
-      if (!this.login.password) { this.errores.loginPassword = 'Escribe tu contraseña'; return }
-      const res = store.login(this.login.alias, this.login.password)
-      if (!res.ok) { this.errorGlobal = res.msg; return }
-      this.exito = '¡Sesión iniciada! Redirigiendo...'
-      setTimeout(() => this.$router.push('/'), 1000)
+    async hacerLogin() {
+
+      try {
+
+        const response = await axios.post(
+          'https://proyecto-api-6s1y.onrender.com/login',
+          {
+            nombre: this.login.alias,
+            contrasena: this.login.password
+          }
+        );
+
+        localStorage.setItem(
+          'usuario',
+          JSON.stringify(response.data)
+        );
+
+        this.$router.push('/');
+
+      } catch (error) {
+        this.errorGlobal =
+          error.response?.data?.detail ||
+          'Credenciales incorrectas';
+      }
     }
   },
-  mounted() {
-    if (this.$route.query.login) this.modo = 'login'
-    if (store.estaLogueado()) this.$router.push('/')
-  }
+      mounted() {
+        
+      if (this.$route.query.login) {
+        this.modo = 'login'
+      }
+
+      if (localStorage.getItem('usuario')) {
+        this.$router.push('/')
+      }
+    }
 }
 </script>
 

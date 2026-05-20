@@ -22,7 +22,7 @@
         <div class="modal-cita-body" v-if="!citaEnviada">
           <div class="field-group">
             <label class="field-label">Tu nombre (o alias)</label>
-            <input v-model="cita.nombre" class="field-input" placeholder="Cómo quieres que te llamen...">
+            <input v-model="cita.nombre_paciente" class="field-input" placeholder="Cómo quieres que te llamen...">
           </div>
           <div class="field-group">
             <label class="field-label">Correo de contacto</label>
@@ -32,6 +32,14 @@
             <label class="field-label">Fecha preferida</label>
             <input v-model="cita.fecha" class="field-input" type="date" :min="hoy">
           </div>
+          <div class="field-group">
+              <label class="field-label">Hora preferida</label>
+              <input
+                v-model="cita.hora"
+                class="field-input"
+                type="time"
+              >
+            </div>
           <div class="field-group">
             <label class="field-label">Motivo de consulta (opcional)</label>
             <textarea v-model="cita.motivo" class="field-textarea" rows="3" placeholder="Cuéntanos brevemente qué te trae..."></textarea>
@@ -46,7 +54,7 @@
           <div class="cita-exito-ico">✅</div>
           <div class="cita-exito-title">¡Solicitud enviada!</div>
           <p>{{ psicologo.nombre }} recibirá tu solicitud en <strong>{{ cita.correo }}</strong>. Te contactarán pronto.</p>
-          <button class="btn-green" @click="modalCita = false; citaEnviada = false">Cerrar</button>
+          <button class="btn-green" @click="cerrarModal">Cerrar</button>
         </div>
       </div>
     </div>
@@ -134,44 +142,112 @@
 </template>
 
 <script>
-import store from '@/store'
+import axios from 'axios';
 
 export default {
   name: 'DetallesView',
-  props: ['id'],
+
   data() {
     return {
       psicologo: null,
+      otrosPsicologos: [],
       loading: true,
       modalCita: false,
       citaEnviada: false,
       errorCita: '',
-      cita: { nombre: '', correo: '', fecha: '', motivo: '' },
+      cita: {
+        nombre_paciente: '',
+        correo: '',
+        fecha: '',
+        hora: '',
+        motivo: ''
+      },
     }
   },
   computed: {
     hoy() {
-      return new Date().toISOString().split('T')[0]
-    },
-    otrosPsicologos() {
-      return store.getPsicologos()
-        .filter(p => p.id !== parseInt(this.id))
-        .slice(0, 3)
+      return new Date().toISOString().split('T')[0];
     }
   },
+
+  created() {
+    this.fetchPsicologo();
+    this.fetchOtrosPsicologos();
+  },
+
   methods: {
-    enviarCita() {
-      this.errorCita = ''
-      if (!this.cita.nombre.trim()) { this.errorCita = 'Escribe cómo quieres que te llamen'; return }
-      if (!this.cita.correo.includes('@')) { this.errorCita = 'Introduce un correo válido'; return }
-      if (!this.cita.fecha) { this.errorCita = 'Selecciona una fecha'; return }
-      this.citaEnviada = true
-    }
-  },
-  mounted() {
-    const p = store.getPsicologoPorId(this.id)
-    this.psicologo = p
-    this.loading = false
+    async fetchPsicologo() {
+      try {
+        this.loading = true;
+        const id = this.$route.params.id;
+        const response = await axios.get(`https://proyecto-api-6s1y.onrender.com/psicologos/${id}`);
+        this.psicologo = response.data;
+        return response.data;
+      } catch (error) {
+        console.error('Error al cargar el psicólogo:', error);
+      } finally {
+        this.loading = false;
+      }
+    },
+    async fetchOtrosPsicologos() {
+      try {
+        const response = await axios.get('https://proyecto-api-6s1y.onrender.com/psicologos');
+        this.otrosPsicologos = response.data.filter(p => p.id !== this.psicologo.id).slice(0, 5);
+      } catch (error) {
+        console.error('Error al cargar otros psicólogos:', error);
+      }
+    },
+    async enviarCita() {
+        this.errorCita = '';
+
+        if (!this.cita.nombre_paciente || !this.cita.correo || !this.cita.fecha || !this.cita.hora) {
+          this.errorCita = 'Por favor completa todos los campos obligatorios.';
+          return;
+        }
+        try {
+
+          const nuevaCita = {
+            nombre_paciente: this.cita.nombre_paciente,
+            correo: this.cita.correo,
+            psicologo_id: this.psicologo.id,
+
+            // temporal hasta login
+            usuario_id: 1,
+
+            fecha: this.cita.fecha,
+
+            // convierte HH:mm → formato ISO válido
+            hora: `${this.cita.hora}:00.000Z`,
+
+            motivo: this.cita.motivo
+          };
+
+          const response = await axios.post(
+            'https://proyecto-api-6s1y.onrender.com/citas',
+            nuevaCita
+          );
+
+          console.log(response.data);
+
+          this.citaEnviada = true;
+
+      } catch (error) {
+
+            console.error(error);
+
+            this.errorCita =
+              error.response?.data?.detail ||
+              'No se pudo agendar la cita.';
+          }
+        },
+
+    cerrarModal() {
+      this.modalCita = false;
+      this.citaEnviada = false;
+      this.cita = { nombre: '', correo: '', fecha: '', motivo: '' };
+      this.errorCita = '';
+    },
+
   }
 }
 </script>

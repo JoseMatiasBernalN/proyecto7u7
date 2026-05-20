@@ -71,32 +71,74 @@
 </template>
 
 <script>
-import store from '@/store'
+import axios from 'axios'
 
 export default {
   name: 'PsicologosView',
+
   data() {
     return {
       psicologos: [],
       busqueda: '',
       filtroUbicacion: '',
+      psicologosLoading: false
     }
   },
+
   computed: {
     ciudades() {
-      return [...new Set(this.psicologos.map(p => p.ubicacion))].sort()
+      return [...new Set(this.psicologos.map(p => p.ubicacion || 'Colombia'))].sort()
     },
+
     psicologosFiltrados() {
       const q = this.busqueda.toLowerCase()
+
       return this.psicologos.filter(p => {
-        const matchBusqueda = !q || p.nombre.toLowerCase().includes(q) || p.descripcion.toLowerCase().includes(q)
-        const matchCiudad = !this.filtroUbicacion || p.ubicacion === this.filtroUbicacion
+        const matchBusqueda =
+          !q ||
+          p.nombre.toLowerCase().includes(q) ||
+          p.descripcion.toLowerCase().includes(q)
+
+        const matchCiudad =
+          !this.filtroUbicacion ||
+          (p.ubicacion || 'Colombia') === this.filtroUbicacion
+
         return matchBusqueda && matchCiudad
       })
     }
   },
+
+  methods: {
+    async getPsicologos() {
+      try {
+        this.psicologosLoading = true
+
+        const response = await axios.get('https://proyecto-api-6s1y.onrender.com/psicologos')
+
+        this.psicologos = response.data.map((p, index) => ({
+          ...p,
+
+          imagen:
+            p.imagen ||
+            `https://randomuser.me/api/portraits/${
+              index % 2 === 0 ? 'women' : 'men'
+            }/${10 + index}.jpg`,
+
+          ubicacion: p.ubicacion || 'Colombia'
+        }))
+
+        console.log(this.psicologos)
+
+      } catch (error) {
+        console.error('Error obteniendo psicólogos:', error)
+      } finally {
+        this.psicologosLoading = false
+      }
+    }
+  },
+
   mounted() {
-    this.psicologos = store.getPsicologos()
+    this.getPsicologos()
   }
 }
 </script>
