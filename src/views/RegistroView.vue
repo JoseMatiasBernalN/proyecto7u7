@@ -215,7 +215,8 @@ export default {
 
       if (!this.registro.alias) { this.errores.alias = 'Escribe un alias'; return }
       if (!this.registro.email) { this.errores.email = 'Escribe tu correo'; return }
-      if (!this.registro.password) { this.errores.password = 'Escribe una contraseña'; return }
+      if (this.registro.password.length < 6) { this.errores.password = 'La contraseña debe tener al menos 6 caracteres'; return }
+      if (!this.registro.localidad_id) { this.errorGlobal = 'Selecciona un país'; return }
 
       try {
         const nuevoUsuario = {
@@ -227,24 +228,16 @@ export default {
           telefono: this.registro.telefono
         };
 
-        await axios.post(
-          '${API_BASE_URL}/usuarios',
-          nuevoUsuario
-        );
+        await axios.post(`${API_BASE_URL}/usuarios`, nuevoUsuario);
 
-        this.exito = '¡Cuenta creada correctamente!';
-
-        setTimeout(() => {
-          this.modo = 'login';
-        }, 1200);
+        this.exito = '¡Cuenta creada correctamente!'
+        setTimeout(() => {this.modo = 'login';}, 1200);
 
       } catch (error) {
-
         console.error(error);
+        const details = error.response?.data?.detail;
+        this.errorGlobal = Array.isArray(details) ? details.join(', ') : details || 'No se pudo crear la cuenta.';
 
-        this.errorGlobal =
-          error.response?.data?.detail ||
-          'No se pudo crear la cuenta.';
   }
     },
     async hacerLogin() {
