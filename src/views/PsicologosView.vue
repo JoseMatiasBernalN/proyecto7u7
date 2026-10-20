@@ -71,7 +71,7 @@
 </template>
 
 <script>
-import axios from 'axios'
+import api from '../api.js'
 
 export default {
   name: 'PsicologosView',
@@ -87,7 +87,7 @@ export default {
 
   computed: {
     ciudades() {
-      return [...new Set(this.psicologos.map(p => p.ubicacion || 'Colombia'))].sort()
+      return [...new Set(this.psicologos.map(p => p.ubicacion))].sort()
     },
 
     psicologosFiltrados() {
@@ -97,11 +97,10 @@ export default {
         const matchBusqueda =
           !q ||
           p.nombre.toLowerCase().includes(q) ||
-          p.descripcion.toLowerCase().includes(q)
+          (p.descripcion || '').toLowerCase().includes(q)
 
         const matchCiudad =
-          !this.filtroUbicacion ||
-          (p.ubicacion || 'Colombia') === this.filtroUbicacion
+          !this.filtroUbicacion || (p.ubicacion || 'Colombia') === this.filtroUbicacion
 
         return matchBusqueda && matchCiudad
       })
@@ -113,18 +112,16 @@ export default {
       try {
         this.psicologosLoading = true
 
-        const response = await axios.get('https://proyecto-api-6s1y.onrender.com/psicologos')
-
-        this.psicologos = response.data.map((p, index) => ({
+        const [{ data: lista }, { data: locs }] = await Promise.all([
+          api.get('/psicologos'),
+          api.get('/Localidades')
+        ])
+        const nombres = Object.fromEntries(locs.map(l => [l.id, l.nombre]))
+        this.psicologos = lista.map((p, index) => ({
           ...p,
+          imagen: p.imagen || `https://randomuser.me/api/portraits/${ index % 2 === 0 ? 'women' : 'men'}/${10 + index}.jpg`,
 
-          imagen:
-            p.imagen ||
-            `https://randomuser.me/api/portraits/${
-              index % 2 === 0 ? 'women' : 'men'
-            }/${10 + index}.jpg`,
-
-          ubicacion: p.ubicacion || 'Colombia'
+          ubicacion: nombres[p.ubicacion_id] || 'Colombia'
         }))
 
         console.log(this.psicologos)

@@ -338,9 +338,8 @@
 </template>
 
 <script>
-import axios from 'axios'
+import api from '../api'
 
-const API_BASE_URL = 'http://127.0.0.1:8000'
 
 const AVATAR_PALETTES = [
   { bg: '#E8F3EB', fg: '#4A7C59' },
@@ -416,65 +415,38 @@ export default {
 
     async cargarPsicologos() {
       try {
-        const response = await axios.get(`${API_BASE_URL}/psicologos`)
+        const response = await api.get(`/psicologos`)
         this.psicologos = response.data
       } catch (error) {
         console.error('Error al cargar psicólogos:', error)
       }
     },
 
-    async iniciarSesion(correo, password) {
-      try {
-        const response = await axios.post(`${API_BASE_URL}/usuarios`, { correo, password })
-        this.usuarioLogueado = response.data
-        this.usuarioActual = { alias: response.data.nombre }
-        localStorage.setItem('usuarioActual', JSON.stringify(this.usuarioLogueado))
-        return true
-      } catch (error) {
-        console.error('Error en inicio de sesión:', error)
-        this.errorPublicar = 'Correo o contraseña incorrectos'
-        throw error
-      }
-    },
-
     cerrarSesion() {
       this.usuarioActual = null
       this.usuarioLogueado = null
-      localStorage.removeItem('usuarioActual')
-      this.posts = []
+      localStorage.removeItem('usuario')
       this.comentariosActivos = []
       this.contadorComentarios = {}
-    },
-
-    async registrarUsuario(data) {
-      try {
-        const response = await axios.post(`${API_BASE_URL}/usuarios`, data)
-        this.usuarioLogueado = response.data
-        this.usuarioActual = { alias: response.data.nombre }
-        localStorage.setItem('usuarioActual', JSON.stringify(this.usuarioLogueado))
-        return response.data
-      } catch (error) {
-        console.error('Error al registrar usuario:', error)
-        throw error
-      }
     },
 
     async cargarPosts() {
       this.loadingPosts = true
       try {
-        const response = await axios.get(`${API_BASE_URL}/citas/mias/todas`)
-        this.posts = response.data.map(cita => ({
-          id: cita.id,
-          titulo: `Cita con psicólogo ${cita.psicologo_id}`,
-          extracto: cita.motivo || 'Sin motivo especificado',
-          categoria: 'Salud',
-          votos: cita.votos || 0,
-          votantes: cita.votantes || [],
+        const { data } = await api.get(`/citas/mias/todas`)
+        this.posts = data.map(c => ({
+          id: c.id,
+          titulo: c.contenido.length > 60 ? c.contenido.substring(0, 60) + '...' : c.contenido,
+          extracto: c.contenido,
+          categoria: 'General',
+          categoriaKey: 'General',
+          votos: 0,
+          votantes: [],
           seccion: 'reciente',
           mood: '#4A7C59',
-          tiempo: cita.fecha,
-          autor: 'Usuario',
-          autor_id: cita.usuario_id,
+          tiempo: new Date(c.created_at).toLocaleString(),
+          autor: `Usuario ${c.usuario_id}`,
+          autor_id: c.usuario_id,
           bg: '#E8F3EB',
           fg: '#4A7C59'
         }))
@@ -500,42 +472,28 @@ export default {
       }
     },
 
-    async votarPost(post, dir) {
+    async votarPost() {
       if (!this.usuarioActual) {
         this.$router.push('/registro?login=1')
         return
-      }
-      try {
-        const response = await axios.put(`${API_BASE_URL}/citas/${post.id}/estado`, {
-          usuario_alias: this.usuarioActual.alias,
-          direccion: dir
-        })
-        post.votos = response.data.nuevo_votos
-        post.votantes = response.data.usuarios_votantes
-        this.contadorComentarios[post.id] = (this.contadorComentarios[post.id] || 0) + dir
-      } catch (error) {
-        console.error('Error al votar:', error)
       }
     },
 
     async enviarComentario() {
       if (!this.nuevoComentario.trim() || !this.postActivo || !this.usuarioActual) return
       try {
-        const response = await axios.post(`${API_BASE_URL}/comentarios`, {
-          post_id: this.postActivo.id,
-          usuario_alias: this.usuarioActual.alias,
-          texto: this.nuevoComentario
+        const { data } = await api.post(`/comentarios`, {
+          contenido: this.nuevoComentario,
+          comentario_id: this.postActivo.id,
         })
-        const comentarioNuevo = {
-          id: response.data.id,
+        this.comentariosActivos.push({
+          id: data.id,
           autor: this.usuarioActual.alias,
-          fecha: new Date().toLocaleString(),
-          texto: this.nuevoComentario
-        }
-        this.comentariosActivos.push(comentarioNuevo)
+          fecha: new Date(data.created_at).toLocaleString(),
+          texto: data.contenido
+        })
         this.contadorComentarios[this.postActivo.id] = this.comentariosActivos.length
         this.nuevoComentario = ''
-        console.log('Comentario enviado:', comentarioNuevo)
       } catch (error) {
         console.error('Error al enviar comentario:', error)
       }
@@ -544,8 +502,13 @@ export default {
     async abrirPost(post) {
       this.postActivo = post
       try {
-        const response = await axios.get(`${API_BASE_URL}/citas/mias/todas`)
-        this.comentariosActivos = response.data
+        const { data } = await api.get(`/citas/mias/todas`)
+        this.comentariosActivos = data.map(r => ({
+          id: r.id,
+          autor: `Usuario ${r.usuario_id}`,
+          fecha: new Date(r.fecha).toLocaleString(),
+          texto: r.contenido
+        }))
           .filter(c => c.post_id === post.id || c.postId === post.id)
           .map(c => ({
             id: c.id || c.postId,
@@ -569,37 +532,31 @@ export default {
       if (!this.usuarioLogueado) { this.errorPublicar = 'Debes iniciar sesión primero'; return }
 
       try {
-        const response = await axios.post(`${API_BASE_URL}/citas`, {
-          nombre_paciente: this.usuarioLogueado.nombre,
-          correo: this.usuarioLogueado.correo,
-          psicologo_id: null,
-          usuario_id: this.usuarioLogueado.id,
-          fecha: new Date().toISOString().split('T')[0],
-          hora: new Date().toTimeString().substring(0, 5),
-          motivo: this.nuevaPublicacion.extracto
+        const {data} = await api.post(`/comentarios`, {
+          contenido: this.nuevaPublicacion.extracto
         })
-
-        const nuevaPublicacion = {
-          id: response.data.id,
+        const nueva = {
+          id: data.id,
           titulo: this.nuevaPublicacion.titulo,
-          extracto: this.nuevaPublicacion.extracto,
+          extracto: data.contenido,
           categoria: this.nuevaPublicacion.categoriaKey,
+          categoriaKey: this.nuevaPublicacion.categoriaKey,
           votos: 0,
           votantes: [],
           seccion: 'reciente',
           mood: '#4A7C59',
-          tiempo: nuevaPublicacion.fecha,
+          tiempo: new Date(data.created_at).toLocaleString(),
           autor: this.usuarioLogueado.nombre,
           autor_id: this.usuarioLogueado.id,
           bg: '#E8F3EB',
           fg: '#4A7C59'
         }
 
-        this.posts.unshift(nuevaPublicacion)
+        this.posts.unshift(nueva)
         this.nuevaPublicacion = { titulo: '', extracto: '', categoriaKey: '' }
         this.modalPublicar = false
         this.seccionActual = 'reciente'
-        console.log('Publicación creada:', nuevaPublicacion)
+        console.log('Publicación creada:', nueva)
       } catch (error) {
         console.error('Error al publicar:', error)
         this.errorPublicar = 'No se pudo crear la publicación. Intenta de nuevo.'

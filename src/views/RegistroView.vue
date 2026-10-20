@@ -113,9 +113,9 @@
       <!-- LOGIN -->
       <div v-if="modo === 'login'" class="auth-form">
         <div class="field-group">
-          <label class="field-label">Tu alias</label>
-          <input v-model="login.alias" class="field-input" :class="{ error: errores.loginAlias }"
-            type="text" placeholder="TuAliasAnónimo" @input="errores.loginAlias = ''" @keyup.enter="hacerLogin">
+          <label class="field-label">Tu correo electrónico</label>
+          <input v-model="login.email" class="field-input" :class="{ error: errores.loginAlias }"
+            type="text" placeholder="Tu@correo.com" @input="errores.loginAlias = ''" @keyup.enter="hacerLogin">
           <div v-if="errores.loginAlias" class="field-error">{{ errores.loginAlias }}</div>
         </div>
 
@@ -180,9 +180,8 @@
 </template>
 
 <script>
-import axios from 'axios'
-
-const API_BASE_URL = 'http://127.0.0.1:8000/'
+import api from '../api.js'
+import { mensajeError } from '../api.js'
 
 export default {
   name: 'RegistroView',
@@ -191,7 +190,7 @@ export default {
       modo: 'registro',
       verPass: false,
       registro: {  alias: '',email: '',password: '',ubicacion: '',telefono: '',localidad_id: ''},
-      login: { alias: '', password: '' },
+      login: { email: '', password: '' },
       errores: {},
       errorGlobal: '',
       exito: '',
@@ -223,46 +222,35 @@ export default {
           nombre: this.registro.alias,
           correo: this.registro.email,
           password: this.registro.password,
-          ubicacion: this.registro.ubicacion,
           localidad_id: Number(this.registro.localidad_id),
-          telefono: this.registro.telefono
+          telefono: this.registro.telefono || null
         };
 
-        await axios.post(`${API_BASE_URL}/usuarios`, nuevoUsuario);
+        await api.post(`/usuarios`, nuevoUsuario);
 
         this.exito = '¡Cuenta creada correctamente!'
         setTimeout(() => {this.modo = 'login';}, 1200);
 
       } catch (error) {
-        console.error(error);
-        const details = error.response?.data?.detail;
-        this.errorGlobal = Array.isArray(details) ? details.join(', ') : details || 'No se pudo crear la cuenta.';
-
-  }
+        this.errorGlobal = mensajeError(error, 'Error al crear la cuenta');
+      }
     },
     async hacerLogin() {
-
+      this.errorGlobal = '';
       try {
 
-        const response = await axios.post(
-          `${API_BASE_URL}/login`,
+        const { data } = await api.post(
+          `/login`,
           {
-            nombre: this.login.alias,
+            correo: this.login.email,
             password: this.login.password
           }
         );
 
-        localStorage.setItem(
-          'usuario',
-          JSON.stringify(response.data)
-        );
-
+        localStorage.setItem('usuario',JSON.stringify(data));
         this.$router.push('/');
-
       } catch (error) {
-        this.errorGlobal =
-          error.response?.data?.detail ||
-          'Credenciales incorrectas';
+        this.errorGlobal = mensajeError(error, 'Credenciales incorrectas');
       }
     }
   },

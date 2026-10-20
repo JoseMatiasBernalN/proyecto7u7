@@ -65,7 +65,7 @@
       <div class="profile-card">
         <div class="profile-header">
           <div class="avatar-ring">
-            <img :src="psicologo.imagen" :alt="psicologo.nombre">
+            <img :src="psicologo.imagen || 'https://ui-avatars.com/api/?name=' + psicologo.nombre" :alt="psicologo.nombre">
           </div>
           <h1 class="profile-nombre">{{ psicologo.nombre }}</h1>
           <div class="profile-badge">Especialista en Salud Mental</div>
@@ -142,7 +142,9 @@
 </template>
 
 <script>
-import axios from 'axios';
+// import api from '../api.js';
+import api from '../api.js'
+//import { mensajeError } from '../api.js'
 
 export default {
   name: 'DetallesView',
@@ -170,19 +172,20 @@ export default {
     }
   },
 
-  created() {
-    this.fetchPsicologo();
-    this.fetchOtrosPsicologos();
+  async created() {
+    await this.fetchPsicologo();
+    await this.fetchOtrosPsicologos();
   },
 
   methods: {
     async fetchPsicologo() {
       try {
         this.loading = true;
-        const id = this.$route.params.id;
-        const response = await axios.get(`https://proyecto-api-6s1y.onrender.com/psicologos/${id}`);
-        this.psicologo = response.data;
-        return response.data;
+        const id = this.$route.params.id
+        const { data } = await api.get(`/psicologos/${id}`)
+        this.psicologo = data
+        const { data: locs } = await api.get('/Localidades')
+        this.psicologo.ubicacion = locs.find(l => l.id === data.localidad_id)?.nombre || ''
       } catch (error) {
         console.error('Error al cargar el psicólogo:', error);
       } finally {
@@ -190,9 +193,10 @@ export default {
       }
     },
     async fetchOtrosPsicologos() {
+      if (!this.psicologo) return;
       try {
-        const response = await axios.get('https://proyecto-api-6s1y.onrender.com/psicologos');
-        this.otrosPsicologos = response.data.filter(p => p.id !== this.psicologo.id).slice(0, 5);
+        const { data } = await api.get('/psicologos');
+        this.otrosPsicologos = data.filter(p => p.id !== this.psicologo.id).slice(0, 5);
       } catch (error) {
         console.error('Error al cargar otros psicólogos:', error);
       }
@@ -200,44 +204,28 @@ export default {
     async enviarCita() {
         this.errorCita = '';
 
-        if (!this.cita.nombre_paciente || !this.cita.correo || !this.cita.fecha || !this.cita.hora) {
-          this.errorCita = 'Por favor completa todos los campos obligatorios.';
+        if (!localStorage.getItem('usuario_id')) {
+          this.$router.push({ name: 'Login' });
           return;
         }
+        if (!this.cita.fecha || !this.cita.hora) {
+          this.errorCita = 'Por favor completa la fecha y la hora.'
+          return
+        }
+
         try {
-
-          const nuevaCita = {
-            nombre_paciente: this.cita.nombre_paciente,
-            correo: this.cita.correo,
+          await api.post('/citas', {
             psicologo_id: this.psicologo.id,
-
-            // temporal hasta login
-            usuario_id: 1,
-
-            fecha: this.cita.fecha,
-
-            // convierte HH:mm → formato ISO válido
-            hora: `${this.cita.hora}:00.000Z`,
-
-            motivo: this.cita.motivo
-          };
-
-          const response = await axios.post(
-            'https://proyecto-api-6s1y.onrender.com/citas',
-            nuevaCita
-          );
-
-          console.log(response.data);
-
+            date: this.cita.fecha,
+            hour: `${this.cita.hora}:00`,
+            description: this.cita.motivo || null
+          })
           this.citaEnviada = true;
-
-      } catch (error) {
-
-            console.error(error);
-
-            this.errorCita =
-              error.response?.data?.detail ||
-              'No se pudo agendar la cita.';
+        } catch (error) {
+            this.modalCita = false
+            this.citaEnviada = false
+            this.cita = { fecha: '', hora: '', motivo: '' }
+            this.errorCita = ''
           }
         },
 
