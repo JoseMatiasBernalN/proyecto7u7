@@ -1,6 +1,5 @@
 <template>
   <div class="app-layout">
-
     <!-- ════════════ MODAL PUBLICAR ════════════ -->
     <div v-if="modalPublicar" class="modal-overlay" @click.self="modalPublicar = false">
       <div class="modal-box">
@@ -17,6 +16,14 @@
           <input v-model="nuevaPublicacion.titulo" class="modal-input" placeholder="Título de tu publicación..." maxlength="120" />
           <div class="char-count">{{ nuevaPublicacion.titulo.length }}/120</div>
           <textarea v-model="nuevaPublicacion.extracto" class="modal-textarea" placeholder="Comparte lo que sientes... este es tu espacio seguro." rows="5"></textarea>
+          <select v-model="nuevaPublicacion.categoriaKey" class="modal-select">
+            <option value="">Selecciona una categoría</option>
+            <option value="Ansiedad">🌡️ Ansiedad</option>
+            <option value="Depresión">🌧️ Depresión</option>
+            <option value="Duelo">🕊️ Duelo y Pérdida</option>
+            <option value="Autoestima">⭐ Autoestima</option>
+            <option value="Noticias">🌱 Noticias de Salud</option>
+          </select>
           <div v-if="errorPublicar" class="modal-error">{{ errorPublicar }}</div>
           <div class="modal-actions">
             <button class="btn-ghost-sm" @click="modalPublicar = false">Cancelar</button>
@@ -36,9 +43,15 @@
         <div class="modal-scroll">
           <div class="modal-bar" :style="{ background: postActivo.mood }"></div>
           <div class="modal-post-header">
+            <div class="modal-vote-row">
+              <button class="vote-btn" :class="{ voted: postActivo.votantes && postActivo.votantes.includes(usuarioActual?.alias) }" @click="votarPost(postActivo, 1)">▲</button>
+              <span class="vote-count">{{ postActivo.votos }}</span>
+              <button class="vote-btn" @click="votarPost(postActivo, -1)">▼</button>
+            </div>
             <div>
               <div class="modal-post-titulo">{{ postActivo.titulo }}</div>
               <div class="modal-post-meta">
+                <span class="tag-category">{{ postActivo.categoria }}</span>
                 <span class="modal-post-autor">{{ postActivo.autor }}</span>
                 <span class="card-time">{{ postActivo.tiempo }}</span>
               </div>
@@ -48,7 +61,8 @@
           <div class="modal-divider"></div>
 
           <!-- COMENTARIOS -->
-          <div class="modal-comments-title">{{ comentariosActivos.length }} respuestas</div>
+          <div v-if="comentariosActivos.length > 0" class="modal-comments-title">{{ comentariosActivos.length }} respuestas</div>
+          <div v-else class="modal-comments-title">Sé el primero en responder 💬</div>
 
           <div v-if="usuarioActual" class="modal-comment-form">
             <div class="anon-avatar-sm" :style="{ background: avatarColor(usuarioActual.alias).bg, color: avatarColor(usuarioActual.alias).fg }">
@@ -67,9 +81,6 @@
             <button class="link-btn" @click="irARegistro">Inicia sesión o regístrate</button>
           </div>
 
-          <div v-if="comentariosActivos.length === 0" class="empty-comments">
-            Sé el primero en responder 💬
-          </div>
           <div v-for="c in comentariosActivos" :key="c.id" class="comment-item">
             <div class="anon-avatar-sm" :style="{ background: avatarColor(c.autor).bg, color: avatarColor(c.autor).fg }">
               {{ c.autor[0].toUpperCase() }}
@@ -99,23 +110,23 @@
       </div>
 
       <nav class="sidebar-nav">
-        <!-- FEEDS -->
         <div class="nav-section">
           <p class="section-label">Feeds</p>
+          <button @click="seccionActual = 'populares'" :class="{ active: seccionActual === 'populares' }" class="nav-item">
+            <span class="nav-icon" style="background:#E8F3EB;">🔥</span> Popular
+          </button>
           <button @click="seccionActual = 'reciente'" :class="{ active: seccionActual === 'reciente' }" class="nav-item">
             <span class="nav-icon" style="background:#F0E4D4;">✨</span> Reciente
           </button>
         </div>
 
-        <!-- PUBLICACIONES (vista general única, reemplaza "Temas de ayuda") -->
         <div class="nav-section">
-          <p class="section-label">Publicaciones</p>
+          <p class="section-label">Temas de ayuda</p>
           <button @click="seccionActual = 'todos'" :class="{ active: seccionActual === 'todos' }" class="nav-item">
-            <span class="nav-icon" style="background:#EAF0FB;">📋</span> General
+            <span class="nav-icon" style="background:#E8F3EB;">📋</span> Todos
           </button>
         </div>
 
-        <!-- RECURSOS (intacto) -->
         <div class="nav-section">
           <p class="section-label">Recursos</p>
           <router-link to="/psicologos" class="nav-item">
@@ -124,6 +135,29 @@
           <button class="nav-item" @click="abrirLineas">
             <span class="nav-icon" style="background:#FFF0E8;">📞</span> Líneas de Crisis
           </button>
+        </div>
+
+        <div class="nav-section">
+          <p class="section-label">Usuario</p>
+          <template v-if="usuarioActual">
+            <div class="nav-item nav-user">
+              <span class="nav-icon" :style="{ background: avatarColor(usuarioActual.alias).bg }">
+                {{ usuarioActual.alias[0].toUpperCase() }}
+              </span>
+              {{ usuarioActual.alias }}
+            </div>
+            <button class="nav-item" @click="cerrarSesion">
+              <span class="nav-icon" style="background:#FFF0E8;">🚪</span> Cerrar sesión
+            </button>
+          </template>
+          <template v-else>
+            <router-link to="/registro" class="nav-item">
+              <span class="nav-icon" style="background:#E8F3EB;">✨</span> Registrarse
+            </router-link>
+            <router-link to="/registro?login=1" class="nav-item">
+              <span class="nav-icon" style="background:#F5EDE8;">🔑</span> Iniciar sesión
+            </router-link>
+          </template>
         </div>
       </nav>
     </aside>
@@ -166,6 +200,7 @@
           <section class="posts-col">
             <div class="feed-header">
               <div class="feed-tabs">
+                <button class="tab" :class="{ active: seccionActual === 'populares' }" @click="seccionActual = 'populares'">🔥 Popular</button>
                 <button class="tab" :class="{ active: seccionActual === 'reciente' }" @click="seccionActual = 'reciente'">✨ Reciente</button>
                 <button class="tab" :class="{ active: seccionActual === 'todos' }" @click="seccionActual = 'todos'">📋 Todo</button>
               </div>
@@ -181,41 +216,58 @@
               <button @click="busqueda = ''" class="clear-search">✕</button>
             </div>
 
-            <div v-if="postsFiltrados.length === 0" class="empty-feed">
-              <div class="empty-icon">🌱</div>
-              <p>No hay publicaciones aquí todavía.</p>
-              <button class="btn-green" @click="modalPublicar = true">Sé el primero en compartir</button>
-            </div>
+            <div v-if="postsFiltrados.length === 0 && !busqueda" class="empty-state">
+                <div v-if="loadingPosts" class="loading-posts">
+                  <div class="loading-item" v-for="i in 3" :key="i"></div>
+                </div>
+                <div v-else class="empty-feed">
+                  <div class="empty-icon">🌱</div>
+                  <p>No hay publicaciones aquí todavía.</p>
+                  <button class="btn-green" @click="modalPublicar = true">Sé el primero en compartir</button>
+                </div>
+              </div>
 
-            <div v-for="post in postsFiltrados" :key="post.id" class="post-card" @click="abrirPost(post)">
-              <div class="mood-bar" :style="{ background: post.mood }"></div>
-              <div class="card-inner">
-                <div class="card-body">
-                  <div class="card-meta">
-                    <span class="tag-community">r/salud_mental</span>
-                    <span class="card-time">{{ post.tiempo }}</span>
+              <template v-else-if="busqueda || postsFiltrados.length > 0">
+              <div v-for="post in postsFiltrados" :key="post.id" class="post-card" @click="abrirPost(post)">
+                <div class="mood-bar" :style="{ background: post.mood }"></div>
+                <div class="card-inner">
+                  <div class="vote-col" @click.stop>
+                    <button class="vote-btn" :class="{ voted: post.votantes && post.votantes.includes(usuarioActual?.alias) }" @click="votarPost(post, 1)">▲</button>
+                    <span class="vote-count">{{ post.votos }}</span>
+                    <button class="vote-btn" @click="votarPost(post, -1)">▼</button>
                   </div>
-                  <div class="card-title">{{ post.titulo }}</div>
-                  <div class="card-excerpt">{{ post.extracto }}</div>
-                  <div class="card-footer" @click.stop>
-                    <span class="card-action" @click="abrirPost(post)">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                      {{ contadorComentarios[post.id] !== undefined ? contadorComentarios[post.id] + ' respuestas' : 'Ver respuestas' }}
-                    </span>
-                    <span class="card-action" @click.stop="compartir(post)">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-                      Compartir
-                    </span>
-                    <div class="anon-badge">
-                      <div class="anon-avatar" :style="{ background: post.bg, color: post.fg }">
-                        {{ post.autor[0].toUpperCase() }}
+                  <div class="card-body">
+                    <div class="card-meta">
+                      <span class="tag-community">r/salud_mental</span>
+                      <span class="tag-category">{{ post.categoria }}</span>
+                      <span class="card-time">{{ post.tiempo }}</span>
+                    </div>
+                    <div class="card-title">{{ post.titulo }}</div>
+                    <div class="card-excerpt">{{ post.extracto }}</div>
+                    <div class="card-footer" @click.stop>
+                      <span class="card-action" @click="abrirPost(post)">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        {{ getComentariosCount(post.id) }} respuestas
+                      </span>
+                      <span class="card-action" @click.stop="compartir(post)">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                        Compartir
+                      </span>
+                      <span class="card-action" @click.stop="votarPost(post, 1)">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                        Apoyar
+                      </span>
+                      <div class="anon-badge">
+                        <div class="anon-avatar" :style="{ background: post.bg, color: post.fg }">
+                          {{ post.autor[0].toUpperCase() }}
+                        </div>
+                        <span class="anon-name">{{ post.autor }}</span>
                       </div>
-                      <span class="anon-name">{{ post.autor }}</span>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </template>
           </section>
 
           <!-- SIDEBAR DERECHO -->
@@ -288,16 +340,7 @@
 <script>
 import axios from 'axios'
 
-// URL de tu API: cámbiala por 'http://localhost:8000' si la corres en tu PC
-const API_URL = 'https://proyecto-api-6s1y.onrender.com'
-
-const api = axios.create({ baseURL: API_URL })
-// Si hay token guardado (después de iniciar sesión), se envía automáticamente
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
+const API_BASE_URL = 'http://127.0.0.1:8000'
 
 const AVATAR_PALETTES = [
   { bg: '#E8F3EB', fg: '#4A7C59' },
@@ -312,18 +355,20 @@ export default {
   name: 'HomeView',
   data() {
     return {
-      seccionActual: 'reciente',
+      seccionActual: 'populares',
       busqueda: '',
       posts: [],
       postActivo: null,
       comentariosActivos: [],
       nuevoComentario: '',
       modalPublicar: false,
-      nuevaPublicacion: { titulo: '', extracto: '' },
+      nuevaPublicacion: { titulo: '', extracto: '', categoriaKey: '' },
       errorPublicar: '',
       usuarioActual: null,
+      usuarioLogueado: null,
       contadorComentarios: {},
-      totalUsuarios: 0,
+      psicologos: [],
+      loadingPosts: false
     }
   },
   computed: {
@@ -331,107 +376,120 @@ export default {
       let lista = this.posts
       if (this.busqueda.trim()) {
         const q = this.busqueda.toLowerCase()
-        return lista.filter(p =>
+        lista = lista.filter(p =>
           p.titulo.toLowerCase().includes(q) ||
-          p.extracto.toLowerCase().includes(q)
+          p.extracto.toLowerCase().includes(q) ||
+          p.categoria.toLowerCase().includes(q)
         )
+        return lista
       }
-      if (this.seccionActual === 'reciente') {
-        lista = [...lista].sort((a, b) => b.id - a.id)
+      const mapSec = {
+        populares:  () => true,
+        reciente:   p => p.seccion === 'reciente',
+        todos:      () => true,
+        ansiedad:   p => p.categoriaKey === 'Ansiedad',
+        depresion:  p => p.categoriaKey === 'Depresión',
+        duelo:      p => p.categoriaKey === 'Duelo',
+        autoestima: p => p.categoriaKey === 'Autoestima',
+        noticias:   p => p.categoriaKey === 'Noticias',
       }
+      const fn = mapSec[this.seccionActual] || (() => true)
+      lista = lista.filter(fn)
+      if (this.seccionActual === 'populares') lista = [...lista].sort((a, b) => b.votos - a.votos)
       return lista
     },
     totalPosts() { return this.posts.length },
+    totalUsuarios() {
+      return this.psicologos.length + 847
+    }
   },
   methods: {
     avatarColor(alias) {
-      const idx = (alias || 'A').split('').reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_PALETTES.length
+      const idx = alias.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_PALETTES.length
       return AVATAR_PALETTES[idx]
     },
-    formatearFecha(f) {
-      return f ? new Date(f).toLocaleDateString('es-CO') : ''
+    getComentariosCount(postId) {
+      return this.contadorComentarios[postId] ?? 0
     },
-    // ⚠️ Si algún dato no aparece, ajusta los nombres de campo aquí
-    obtenerAlias(item) {
-      return item.alias || item.usuario?.alias || item.autor?.alias ||
-             item.usuario_alias || item.nombre_usuario || item.usuario?.nombre || 'Anónimo'
-    },
-    mapComentario(c) {
-      const alias = this.obtenerAlias(c)
-      const pal = this.avatarColor(alias)
-      const texto = c.contenido || c.texto || c.comentario || ''
-      const [primera, ...resto] = texto.split('\n')
-      return {
-        id: c.id,
-        titulo: primera.slice(0, 120),
-        extracto: resto.length ? resto.join('\n').trim() : texto,
-        autor: alias,
-        tiempo: this.formatearFecha(c.fecha_creacion || c.fecha || c.created_at),
-        mood: pal.fg, bg: pal.bg, fg: pal.fg,
-      }
-    },
-    async cargarPosts() {
+
+    // ===================== MÉTODOS API =====================
+
+    async cargarPsicologos() {
       try {
-        const { data } = await api.get('/comentarios')
-        this.posts = data.map(this.mapComentario)
-      } catch (e) {
-        console.error('Error al cargar publicaciones', e)
+        const response = await axios.get(`${API_BASE_URL}/psicologos`)
+        this.psicologos = response.data
+      } catch (error) {
+        console.error('Error al cargar psicólogos:', error)
       }
     },
-    async abrirPost(post) {
-      this.postActivo = post
-      this.nuevoComentario = ''
+
+    async iniciarSesion(correo, password) {
+      try {
+        const response = await axios.post(`${API_BASE_URL}/usuarios`, { correo, password })
+        this.usuarioLogueado = response.data
+        this.usuarioActual = { alias: response.data.nombre }
+        localStorage.setItem('usuarioActual', JSON.stringify(this.usuarioLogueado))
+        return true
+      } catch (error) {
+        console.error('Error en inicio de sesión:', error)
+        this.errorPublicar = 'Correo o contraseña incorrectos'
+        throw error
+      }
+    },
+
+    cerrarSesion() {
+      this.usuarioActual = null
+      this.usuarioLogueado = null
+      localStorage.removeItem('usuarioActual')
+      this.posts = []
       this.comentariosActivos = []
+      this.contadorComentarios = {}
+    },
+
+    async registrarUsuario(data) {
       try {
-        const { data } = await api.get(`/respuestas/comentario/${post.id}`)
-        this.comentariosActivos = data.map(r => ({
-          id: r.id,
-          autor: this.obtenerAlias(r),
-          fecha: this.formatearFecha(r.fecha_creacion || r.fecha || r.created_at),
-          texto: r.contenido || r.texto || '',
+        const response = await axios.post(`${API_BASE_URL}/usuarios`, data)
+        this.usuarioLogueado = response.data
+        this.usuarioActual = { alias: response.data.nombre }
+        localStorage.setItem('usuarioActual', JSON.stringify(this.usuarioLogueado))
+        return response.data
+      } catch (error) {
+        console.error('Error al registrar usuario:', error)
+        throw error
+      }
+    },
+
+    async cargarPosts() {
+      this.loadingPosts = true
+      try {
+        const response = await axios.get(`${API_BASE_URL}/citas/mias/todas`)
+        this.posts = response.data.map(cita => ({
+          id: cita.id,
+          titulo: `Cita con psicólogo ${cita.psicologo_id}`,
+          extracto: cita.motivo || 'Sin motivo especificado',
+          categoria: 'Salud',
+          votos: cita.votos || 0,
+          votantes: cita.votantes || [],
+          seccion: 'reciente',
+          mood: '#4A7C59',
+          tiempo: cita.fecha,
+          autor: 'Usuario',
+          autor_id: cita.usuario_id,
+          bg: '#E8F3EB',
+          fg: '#4A7C59'
         }))
-        this.contadorComentarios[post.id] = this.comentariosActivos.length
-      } catch (e) {
-        console.error('Error al cargar respuestas', e)
+      } catch (error) {
+        console.error('Error al cargar posts:', error)
+        this.posts = []
+      } finally {
+        this.loadingPosts = false
       }
     },
-    async enviarComentario() {
-      if (!this.nuevoComentario.trim()) return
-      try {
-        const { data } = await api.post('/respuestas', {
-          comentario_id: this.postActivo.id,
-          contenido: this.nuevoComentario,
-        })
-        this.comentariosActivos.push({
-          id: data.id,
-          autor: this.usuarioActual.alias,
-          fecha: 'ahora',
-          texto: this.nuevoComentario,
-        })
-        this.contadorComentarios[this.postActivo.id] = this.comentariosActivos.length
-        this.nuevoComentario = ''
-      } catch (e) {
-        console.error('Error al responder', e)
-        if (e.response?.status === 401) this.cerrarSesion()
-      }
+
+    buscar() {
+      // Filtrado ya está en computed
     },
-    async publicar() {
-      this.errorPublicar = ''
-      if (!this.nuevaPublicacion.titulo.trim()) { this.errorPublicar = 'El título no puede estar vacío'; return }
-      if (!this.nuevaPublicacion.extracto.trim()) { this.errorPublicar = 'Escribe algo en el contenido'; return }
-      try {
-        await api.post('/comentarios', {
-          contenido: `${this.nuevaPublicacion.titulo.trim()}\n${this.nuevaPublicacion.extracto.trim()}`,
-        })
-        await this.cargarPosts()
-        this.nuevaPublicacion = { titulo: '', extracto: '' }
-        this.modalPublicar = false
-        this.seccionActual = 'reciente'
-      } catch (e) {
-        this.errorPublicar = e.response?.data?.detail || 'No se pudo publicar'
-      }
-    },
-    buscar() { /* reactivo vía computed */ },
+
     compartir(post) {
       const texto = `${post.titulo} — MenteSana`
       if (navigator.share) {
@@ -441,27 +499,133 @@ export default {
         alert('¡Enlace copiado al portapapeles!')
       }
     },
-    cerrarSesion() {
-      localStorage.removeItem('token')
-      localStorage.removeItem('usuario')
-      this.usuarioActual = null
+
+    async votarPost(post, dir) {
+      if (!this.usuarioActual) {
+        this.$router.push('/registro?login=1')
+        return
+      }
+      try {
+        const response = await axios.put(`${API_BASE_URL}/citas/${post.id}/estado`, {
+          usuario_alias: this.usuarioActual.alias,
+          direccion: dir
+        })
+        post.votos = response.data.nuevo_votos
+        post.votantes = response.data.usuarios_votantes
+        this.contadorComentarios[post.id] = (this.contadorComentarios[post.id] || 0) + dir
+      } catch (error) {
+        console.error('Error al votar:', error)
+      }
     },
-    irARegistro() {
-      this.modalPublicar = false
-      this.$router.push('/registro')
+
+    async enviarComentario() {
+      if (!this.nuevoComentario.trim() || !this.postActivo || !this.usuarioActual) return
+      try {
+        const response = await axios.post(`${API_BASE_URL}/comentarios`, {
+          post_id: this.postActivo.id,
+          usuario_alias: this.usuarioActual.alias,
+          texto: this.nuevoComentario
+        })
+        const comentarioNuevo = {
+          id: response.data.id,
+          autor: this.usuarioActual.alias,
+          fecha: new Date().toLocaleString(),
+          texto: this.nuevoComentario
+        }
+        this.comentariosActivos.push(comentarioNuevo)
+        this.contadorComentarios[this.postActivo.id] = this.comentariosActivos.length
+        this.nuevoComentario = ''
+        console.log('Comentario enviado:', comentarioNuevo)
+      } catch (error) {
+        console.error('Error al enviar comentario:', error)
+      }
     },
+
+    async abrirPost(post) {
+      this.postActivo = post
+      try {
+        const response = await axios.get(`${API_BASE_URL}/citas/mias/todas`)
+        this.comentariosActivos = response.data
+          .filter(c => c.post_id === post.id || c.postId === post.id)
+          .map(c => ({
+            id: c.id || c.postId,
+            autor: c.autor || 'Usuario',
+            fecha: c.fecha || new Date().toLocaleString(),
+            texto: c.texto || ''
+          }))
+        this.contadorComentarios[post.id] = this.comentariosActivos.length
+      } catch (error) {
+        console.error('Error al cargar comentarios:', error)
+        this.comentariosActivos = []
+      }
+      this.nuevoComentario = ''
+    },
+
+    async publicar() {
+      this.errorPublicar = ''
+      if (!this.nuevaPublicacion.titulo.trim()) { this.errorPublicar = 'El título no puede estar vacío'; return }
+      if (!this.nuevaPublicacion.extracto.trim()) { this.errorPublicar = 'Escribe algo en el contenido'; return }
+      if (!this.nuevaPublicacion.categoriaKey) { this.errorPublicar = 'Selecciona una categoría'; return }
+      if (!this.usuarioLogueado) { this.errorPublicar = 'Debes iniciar sesión primero'; return }
+
+      try {
+        const response = await axios.post(`${API_BASE_URL}/citas`, {
+          nombre_paciente: this.usuarioLogueado.nombre,
+          correo: this.usuarioLogueado.correo,
+          psicologo_id: null,
+          usuario_id: this.usuarioLogueado.id,
+          fecha: new Date().toISOString().split('T')[0],
+          hora: new Date().toTimeString().substring(0, 5),
+          motivo: this.nuevaPublicacion.extracto
+        })
+
+        const nuevaPublicacion = {
+          id: response.data.id,
+          titulo: this.nuevaPublicacion.titulo,
+          extracto: this.nuevaPublicacion.extracto,
+          categoria: this.nuevaPublicacion.categoriaKey,
+          votos: 0,
+          votantes: [],
+          seccion: 'reciente',
+          mood: '#4A7C59',
+          tiempo: nuevaPublicacion.fecha,
+          autor: this.usuarioLogueado.nombre,
+          autor_id: this.usuarioLogueado.id,
+          bg: '#E8F3EB',
+          fg: '#4A7C59'
+        }
+
+        this.posts.unshift(nuevaPublicacion)
+        this.nuevaPublicacion = { titulo: '', extracto: '', categoriaKey: '' }
+        this.modalPublicar = false
+        this.seccionActual = 'reciente'
+        console.log('Publicación creada:', nuevaPublicacion)
+      } catch (error) {
+        console.error('Error al publicar:', error)
+        this.errorPublicar = 'No se pudo crear la publicación. Intenta de nuevo.'
+      }
+    },
+
     abrirLineas() {
       window.open('https://www.asivamosensalud.org', '_blank')
     },
   },
-  async mounted() {
-    this.usuarioActual = JSON.parse(localStorage.getItem('usuario') || 'null')
-    await this.cargarPosts()
-    try {
-      const { data } = await api.get('/usuarios')
-      this.totalUsuarios = data.length
-    } catch (e) { /* queda en 0 */ }
-  },
+  mounted() {
+    this.cargarPsicologos()
+    this.cargarPosts()
+    
+    const usuarioGuardado = localStorage.getItem('usuarioActual')
+    if (usuarioGuardado) {
+      this.usuarioLogueado = JSON.parse(usuarioGuardado)
+      this.usuarioActual = {
+        alias: this.usuarioLogueado?.nombre || '',
+      }
+    }
+    
+    if (this.usuarioLogueado?.localidad_id) {
+      this.cargarNumerosEmergencia()
+    }
+  }
 }
 </script>
 
@@ -479,8 +643,7 @@ export default {
   position: fixed; inset: 0;
   background: rgba(44, 31, 20, 0.45);
   z-index: 200;
-  display: flex; align-items: center; justify-content: center;
-  padding: 20px;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
 }
 .modal-box {
   background: var(--cream-light);
@@ -616,6 +779,7 @@ export default {
 }
 .nav-item:hover { background: var(--cream-mid); }
 .nav-item.active { background: var(--green-bg); color: #2D6040; font-weight: 500; }
+.nav-user { cursor: default; font-weight: 500; color: var(--green); }
 .nav-icon {
   width: 28px; height: 28px; border-radius: 8px;
   display: flex; align-items: center; justify-content: center;
@@ -681,13 +845,6 @@ export default {
   display: flex; align-items: center; justify-content: space-between;
 }
 .clear-search { background: none; border: none; color: var(--green); cursor: pointer; font-size: 14px; }
-
-.empty-feed {
-  text-align: center; padding: 48px 24px;
-  background: var(--cream-light); border: 1px dashed var(--border-mid); border-radius: 16px;
-}
-.empty-icon { font-size: 40px; margin-bottom: 12px; }
-.empty-feed p { color: var(--text-faint); font-size: 14px; margin-bottom: 16px; }
 
 /* CARDS */
 .post-card {

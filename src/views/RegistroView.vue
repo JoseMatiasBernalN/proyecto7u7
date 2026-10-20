@@ -182,6 +182,8 @@
 <script>
 import axios from 'axios'
 
+const API_BASE_URL = 'http://127.0.0.1:8000/'
+
 export default {
   name: 'RegistroView',
   data() {
@@ -219,14 +221,14 @@ export default {
         const nuevoUsuario = {
           nombre: this.registro.alias,
           correo: this.registro.email,
-          contraseña: this.registro.password,
+          password: this.registro.password,
           ubicacion: this.registro.ubicacion,
           localidad_id: Number(this.registro.localidad_id),
           telefono: this.registro.telefono
         };
 
         await axios.post(
-          'https://proyecto-api-6s1y.onrender.com/usuarios',
+          '${API_BASE_URL}/usuarios',
           nuevoUsuario
         );
 
@@ -250,10 +252,10 @@ export default {
       try {
 
         const response = await axios.post(
-          'https://proyecto-api-6s1y.onrender.com/login',
+          `${API_BASE_URL}/login`,
           {
             nombre: this.login.alias,
-            contrasena: this.login.password
+            password: this.login.password
           }
         );
 
